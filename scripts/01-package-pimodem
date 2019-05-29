@@ -13,9 +13,9 @@ install_pimodem() {
 	mkdir -p $TOP/build/pimodem/etc/conf.d || exit 1
 	mkdir -p $TOP/build/pimodem/usr/sbin || exit 1
 	git submodule update --init pimodem || exit 1
-	GOARCH=arm CGOCC=arm-linux-musleabihf-gcc CGO_CFLAGS="-g -O2 -I/opt/cross/include" CGO_LDFLAGS="-g -O2 -L/opt/cross/lib" make -C $TOP/pimodem/src
+	GOARCH=arm CGOCC=arm-linux-musleabihf-gcc CGO_CFLAGS="-g -O2 -I/opt/cross/include" CGO_LDFLAGS="-g -O2 -L/opt/cross/lib" make --no-print-directory -C $TOP/pimodem
 
-	install -m 755 -D -t $TOP/build/apkovl/usr/sbin $TOP/pimodem/src/bin/$PACKAGE || exit 1
+	install -m 755 -D -t $TOP/build/pimodem/usr/sbin $TOP/pimodem/src/bin/$PACKAGE || exit 1
 	cat <<OPENRC-CONF > $TOP/build/pimodem/etc/conf.d/pimodem
 SERIAL=${serial}
 LOGDEST=${logdest}
