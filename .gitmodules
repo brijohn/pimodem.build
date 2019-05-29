@@ -1,0 +1,12 @@
+[submodule "pimodem"]
+	path = pimodem
+	url = https://github.com/brijohn/pimodem.git
+	branch = master
+[submodule "abuild"]
+	path = abuild
+	url = https://github.com/alpinelinux/abuild.git
+	branch = master
+[submodule "apk-tools"]
+	path = apk-tools
+	url = https://github.com/alpinelinux/apk-tools.git
+	branch = master
