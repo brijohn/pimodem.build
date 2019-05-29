@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
 
 mcopy -s -b -i $TOP/build/pimodem.img $TOP/build/rootfs/* ::

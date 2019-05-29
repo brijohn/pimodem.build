@@ -1,0 +1,41 @@
+#!/bin/bash
+
+TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
+
+PACKAGE=github.com/brijohn/pimodem
+
+install_pimodem() {
+	local serial=$1
+	local logdest=$2
+	local port=$3
+	local ipaddr=$4
+	mkdir -p $TOP/build/pimodem/etc/init.d || exit 1
+	mkdir -p $TOP/build/pimodem/etc/conf.d || exit 1
+	mkdir -p $TOP/build/pimodem/usr/sbin || exit 1
+	git submodule update --init pimodem || exit 1
+	GOARCH=arm CGOCC=arm-linux-musleabihf-gcc CGO_CFLAGS="-g -O2 -I/opt/cross/include" CGO_LDFLAGS="-g -O2 -L/opt/cross/lib" make -C $TOP/pimodem/src
+
+	install -m 755 -D -t $TOP/build/apkovl/usr/sbin $TOP/pimodem/src/bin/$PACKAGE || exit 1
+	cat <<OPENRC-CONF > $TOP/build/pimodem/etc/conf.d/pimodem
+SERIAL=${serial}
+LOGDEST=${logdest}
+PORT=${port}
+IPADDR=${ipaddr}
+OPENRC-CONF
+	cat <<'OPENRC-INIT' > $TOP/build/pimodem/etc/init.d/pimodem
+#!/sbin/openrc-run
+
+command=/usr/sbin/pimodem
+command_args="-d ${SERIAL} --logger=${LOGDEST} --port=${PORT} --ip=${IPADDR}"
+command_background=true
+pidfile="/var/run/${RC_SVCNAME}.pid"
+
+depend() {
+	need net
+	want logger
+}
+OPENRC-INIT
+}
+
+install_pimodem /dev/ttyAMA0 syslog 6400 0.0.0.0
+

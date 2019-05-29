@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
 
 declare -A TOOLS=( [abuild]="abuild-tar" [apk-tools]="src/apk" )
@@ -7,10 +7,12 @@ declare -A TOOLS=( [abuild]="abuild-tar" [apk-tools]="src/apk" )
 install_tool() {
 	local tool=$1
 	mkdir -p $TOP/build/tools || exit 1
+	git submodule update --init $tool || exit 1
 	CFLAGS=-Werror=unused-result LUAAPK= make --no-print-directory -C $TOP/$tool || exit 1
 	cp $TOP/$tool/${TOOLS[$tool]} $TOP/build/tools || exit 1
 }
 
 install_tool abuild
-
 install_tool apk-tools
+
+exit 0

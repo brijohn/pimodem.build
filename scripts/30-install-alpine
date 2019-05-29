@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
 
@@ -46,9 +45,9 @@ generate_index() {
 	local signed=.SIGN.RSA.brijohn@gmail.com.pub
 	local untrusted=$repo/armhf/APKINDEX.untrusted.tar.gz
 	local index=$repo/armhf/APKINDEX.tar.gz
-	$TOP/build/apk.static index -o $untrusted $repo/armhf/*.apk >/dev/null 2>&1 || exit 1
+	$TOP/build/tools/apk index -o $untrusted $repo/armhf/*.apk >/dev/null 2>&1 || exit 1
 	openssl dgst -sha1 -sign $TOP/build/keys/brijohn@gmail.com -out $repo/armhf/$signed $untrusted || exit 1
-	tar -c -O -C $repo/armhf $signed | head -c -9216 | gzip -9 > $sig
+	tar -c -O -C $repo/armhf $signed | $TOP/build/tools/abuild-tar --cut | gzip -9 > $sig
 	cat $sig $untrusted > $index
 	rm -rf $untrusted $sig $repo/armhf/$signed
 }
