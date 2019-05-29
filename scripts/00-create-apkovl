@@ -1,0 +1,134 @@
+#!/bin/bash
+
+TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
+PACKAGE=/github.com/brijohn/pimodem
+
+install_pimodem() {
+	local serial=$1
+	local logdest=$2
+	local port=$3
+	local ipaddr=$4
+	mkdir -p $TOP/build/apkovl/etc/init.d || exit 1
+	mkdir -p $TOP/build/apkovl/etc/conf.d || exit 1
+	install -m 755 -D -t $TOP/build/apkovl/usr/sbin $TOP/src/bin/$PACKAGE || exit 1
+	cat <<OPENRC-CONF > $TOP/build/apkovl/etc/conf.d/pimodem
+SERIAL=${serial}
+LOGDEST=${logdest}
+PORT=${port}
+IPADDR=${ipaddr}
+OPENRC-CONF
+	cat <<'OPENRC-INIT' > $TOP/build/apkovl/etc/init.d/pimodem
+#!/sbin/openrc-run
+
+command=/usr/sbin/pimodem
+command_args="-d ${SERIAL} --logger=${LOGDEST} --port=${PORT} --ip=${IPADDR}"
+command_background=true
+pidfile="/var/run/${RC_SVCNAME}.pid"
+
+depend() {
+	need net
+	want logger
+}
+OPENRC-INIT
+}
+
+setup_lbu() {
+	mkdir -p $TOP/build/apkovl/etc/lbu/
+	cat <<FSTAB > $TOP/build/apkovl/etc/fstab
+/dev/mmcblk0 /media/mmcblk0 vfat ro,relatime,fmask=0022,dmask=0022,errors=remount-ro 0 0
+FSTAB
+	cat <<LBU > $TOP/build/apkovl/etc/lbu/lbu.conf
+DEFAULT_CIPHER=aes-256-cbc
+LBU_MEDIA=mmcblk0
+LBU
+}
+
+setup_network() {
+	mkdir -p $TOP/build/apkovl/etc/network/
+	cat <<ETH0 > $TOP/build/apkovl/etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+ETH0
+
+	cat <<RESOLV > $TOP/build/apkovl/etc/resolv.conf
+nameserver 8.8.8.8
+RESOLV
+
+	cat <<HOSTNAME > $TOP/build/apkovl/etc/hostname
+pimodem
+HOSTNAME
+
+	cat <<HOSTS > $TOP/build/apkovl/etc/hosts
+127.0.0.1	pimodem
+HOSTS
+}
+
+generate_keys() {
+	mkdir -p $TOP/build/keys || exit 1
+	mkdir -p $TOP/build/apkovl/etc/apk/keys || exit 1
+	openssl genrsa -out $TOP/build/keys/brijohn@gmail.com 2048 >/dev/null 2>&1 || exit 1
+	openssl rsa -in $TOP/build/keys/brijohn@gmail.com -pubout -out $TOP/build/keys/brijohn@gmail.com.pub >/dev/null 2>&1 || exit 1
+	cp $TOP/build/keys/brijohn@gmail.com.pub $TOP/build/apkovl/etc/apk/keys || exit 1
+}
+
+setup_keymap() {
+	local layout=$1
+	local variant=$2
+	mkdir -p $TOP/build/apkovl/etc/keymap || exit 1
+	mkdir -p $TOP/build/apkovl/etc/conf.d || exit 1
+	ln -sf /usr/share/bkeymaps/${layout}/${variant}.bmap.gz $TOP/build/apkovl/etc/keymap/${variant}.bmap.gz || exit 1¬
+	cat <<LOADKMAP > $TOP/build/apkovl/etc/conf.d/loadkmap
+KEYMAP=/etc/keymap/${variant}.bmap.gz
+LOADKMAP
+}
+
+configure_run_levels() {
+	mkdir -p $TOP/build/apkovl/etc/runlevels/boot || exit 1
+	mkdir -p $TOP/build/apkovl/etc/runlevels/default || exit 1
+	ln -sf /etc/init.d/urandom $TOP/build/apkovl/etc/runlevels/boot/urandom || exit 1
+	ln -sf /etc/init.d/networking $TOP/build/apkovl/etc/runlevels/boot/networking || exit 1
+	ln -sf /etc/init.d/loadkmap $TOP/build/apkovl/etc/runlevels/boot/loadkmap || exit 1
+	ln -sf /etc/init.d/swclock $TOP/build/apkovl/etc/runlevels/boot/swclock || exit 1
+	ln -sf /etc/init.d/modloop $TOP/build/apkovl/etc/runlevels/boot/modloop || exit 1
+	ln -sf /etc/init.d/chronyd $TOP/build/apkovl/etc/runlevels/default/chronyd || exit 1
+	ln -sf /etc/init.d/crond $TOP/build/apkovl/etc/runlevels/default/crond || exit 1
+	ln -sf /etc/init.d/acpid $TOP/build/apkovl/etc/runlevels/default/acpid || exit 1
+	ln -sf /etc/init.d/pimodem $TOP/build/apkovl/etc/runlevels/default/pimodem || exit 1
+}
+
+configure_world() {
+	mkdir -p $TOP/build/apkovl/etc/apk || exit 1
+	echo "/media/mmcblk0/apks" >> $TOP/build/apkovl/etc/apk/repositories
+	echo "/media/mmcblk0/pimodem" >> $TOP/build/apkovl/etc/apk/repositories
+	echo "alpine-base" >> $TOP/build/apkovl/etc/apk/world
+	echo "alsa-lib" >> $TOP/build/apkovl/etc/apk/world
+	echo "alsa-lib-dev" >> $TOP/build/apkovl/etc/apk/world
+	echo "chrony" >> $TOP/build/apkovl/etc/apk/world
+	echo "kbd-bkeymaps" >> $TOP/build/apkovl/etc/apk/world
+	echo "openssl" >> $TOP/build/apkovl/etc/apk/world
+	echo "tzdata" >> $TOP/build/apkovl/etc/apk/world
+}
+
+configure_timezone() {
+	tz=$1
+	ln -sf /usr/share/zoneinfo/${tz} $TOP/build/apkovl/etc/localtime
+}
+
+rm -rf $TOP/build/apkovl
+mkdir -p $TOP/build/apkovl/ || exit 1
+
+# install_pimodem /dev/ttyAMA0 syslog 6400 0.0.0.0
+setup_network
+configure_world
+generate_keys
+configure_run_levels
+configure_timezone UTC
+setup_keymap us us
+setup_lbu
+
+tar czf $TOP/build/pimodem.apkovl.tar.gz -C $TOP/build/apkovl . || exit 1
+
+exit 0

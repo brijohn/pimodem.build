@@ -1,0 +1,65 @@
+#!/bin/bash
+set -x
+
+TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
+
+download_and_unpack() {
+	local url=$1
+	local file=$(basename $url)
+	wget -q -O $TOP/build/downloads/${file} $url || exit 1
+	tar xzf $TOP/build/downloads/${file} --no-same-permissions --no-same-owner -m -C $TOP/build/rootfs 2>/dev/null
+}
+
+parse_field() {
+	local file=$1
+	local field=$2
+	echo $(tar -O -xzf $1 .PKGINFO 2>/dev/null | sed -n -r "s/$field = (.*)/\1/p"| tr '\n' ' ')
+}
+
+add_apk() {
+	local apk=$1
+	local repo=$2/armhf
+	mkdir -p $repo
+	wget -q -O $repo/${apk} http://dl-cdn.alpinelinux.org/alpine/v3.9/main/armhf/${apk} || exit 1
+#	echo $repo/$apk
+#	echo C:  # >>$repo/APKINDEX
+#	echo P:$(parse_field $repo/$apk pkgname) # >>$repo/APKINDEX
+#	echo V:$(parse_field $repo/$apk pkgver) # >>$repo/APKINDEX
+#	echo A:$(parse_field $repo/$apk arch) # >>$repo/APKINDEX
+#	echo S:$(stat --printf="%s" $repo/$apk) # >>$repo/APKINDEX
+#	echo I:$(parse_field $repo/$apk size) # >>$repo/APKINDEX
+#	echo T:$(parse_field $repo/$apk pkgdesc) # >>$repo/APKINDEX
+#	echo U:$(parse_field $repo/$apk url) # >>$repo/APKINDEX
+#	echo L:$(parse_field $repo/$apk license) # >>$repo/APKINDEX
+#	echo o:$(parse_field $repo/$apk origin) # >>$repo/APKINDEX
+#	echo m:$(parse_field $repo/$apk maintainer) # >>$repo/APKINDEX
+#	echo t:$(parse_field $repo/$apk builddate) #>>$repo/APKINDEX
+#	echo c:$(parse_field $repo/$apk commit) #>>$repo/APKINDEX
+#	echo D:$(parse_field $repo/$apk depend) #>>$repo/APKINDEX
+#	echo p:$(parse_field $repo/$apk provides) #>>$repo/APKINDEX
+#	echo #>>$repo/APKINDEX
+}
+
+generate_index() {
+	local repo=$1
+	local sig=$repo/armhf/signature.tar.gz
+	local signed=.SIGN.RSA.brijohn@gmail.com.pub
+	local untrusted=$repo/armhf/APKINDEX.untrusted.tar.gz
+	local index=$repo/armhf/APKINDEX.tar.gz
+	$TOP/build/apk.static index -o $untrusted $repo/armhf/*.apk >/dev/null 2>&1 || exit 1
+	openssl dgst -sha1 -sign $TOP/build/keys/brijohn@gmail.com -out $repo/armhf/$signed $untrusted || exit 1
+	tar -c -O -C $repo/armhf $signed | head -c -9216 | gzip -9 > $sig
+	cat $sig $untrusted > $index
+	rm -rf $untrusted $sig $repo/armhf/$signed
+}
+
+mkdir -p $TOP/build/downloads/ || exit 1
+
+download_and_unpack "http://dl-cdn.alpinelinux.org/alpine/v3.9/releases/armhf/alpine-rpi-3.9.4-armhf.tar.gz" $TOP/build/rootfs
+add_apk alsa-lib-1.1.8-r0.apk $TOP/build/rootfs/pimodem/
+add_apk alsa-lib-dev-1.1.8-r0.apk $TOP/build/rootfs/pimodem/
+add_apk pkgconf-1.6.0-r0.apk $TOP/build/rootfs/pimodem/
+generate_index $TOP/build/rootfs/pimodem/
+cp $TOP/build/pimodem.apkovl.tar.gz $TOP/build/rootfs
+
+exit 0

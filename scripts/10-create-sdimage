@@ -1,0 +1,19 @@
+#!/bin/bash
+
+TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
+
+create_image() {
+	local file=$TOP/build/$1
+	local size=$2
+	dd if=/dev/zero of=$file bs=1M count=$size >/dev/null 2>&1 || exit 1
+	parted -s $file "mklabel msdos" || exit 1
+	parted -s $file "mkpart primary fat32 0% 100%" || exit 1
+	parted -s $file "set 1 boot on" || exit 1
+	mkfs.msdos -F32 $file >/dev/null 2>&1 || exit 1
+}
+
+rm -rf $TOP/build/rootfs 
+mkdir -p $TOP/build/rootfs || exit 1
+create_image pimodem.img 500
+
+exit 0
