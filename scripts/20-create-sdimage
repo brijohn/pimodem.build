@@ -2,18 +2,23 @@
 
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
 
+if [ ! -f $TOP/scripts/functions.sh ]; then
+	echo "Failed to source functions.sh" && exit 1
+else
+	. $TOP/scripts/functions.sh
+fi
+
 create_image() {
-	local file=$TOP/build/$1
-	local size=$2
-	rm -rf $TOP/build/rootfs 
-	mkdir -p $TOP/build/rootfs || exit 1
-	dd if=/dev/zero of=$file bs=1M count=$size >/dev/null 2>&1 || exit 1
-	parted -s $file "mklabel msdos" || exit 1
-	parted -s $file "mkpart primary fat32 0% 100%" || exit 1
-	parted -s $file "set 1 boot on" || exit 1
-	mkfs.msdos -F32 $file >/dev/null 2>&1 || exit 1
+	local file=$BUILDDIR/$1
+	local size=$(($2-1))
+	dd if=/dev/zero of=$file bs=1M count=$size >/dev/null 2>&1 || return $?
+	mkfs.msdos -F32 $file >/dev/null 2>&1 || return $?
+	fallocate -i --offset=0 --length=1MiB $file || return $?
+	parted -s $file "mklabel msdos" || return $?
+	parted -s $file "mkpart primary fat32 0% 100%" || return $?
+	parted -s $file "set 1 boot on" || return $?
 }
 
-create_image pimodem.img 500
+create_image pimodem.img 500 || exit 1
 
 exit 0

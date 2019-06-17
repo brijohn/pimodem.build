@@ -2,6 +2,12 @@
 
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
 
+if [ ! -f $TOP/scripts/functions.sh ]; then
+	echo "Failed to source functions.sh" && exit 1
+else
+	. $TOP/scripts/functions.sh
+fi
+
 download_and_unpack() {
 	local url=$1
 	local file=$(basename $url)
@@ -42,23 +48,31 @@ add_apk() {
 generate_index() {
 	local repo=$1
 	local sig=$repo/armhf/signature.tar.gz
-	local signed=.SIGN.RSA.brijohn@gmail.com.pub
+	local signed=.SIGN.RSA.$PUBKEY
 	local untrusted=$repo/armhf/APKINDEX.untrusted.tar.gz
 	local index=$repo/armhf/APKINDEX.tar.gz
-	$TOP/build/tools/apk index -o $untrusted $repo/armhf/*.apk >/dev/null 2>&1 || exit 1
-	openssl dgst -sha1 -sign $TOP/build/keys/brijohn@gmail.com -out $repo/armhf/$signed $untrusted || exit 1
+	$TOP/build/tools/apk index --rewrite-arch armhf -o $untrusted $repo/armhf/*.apk >/dev/null 2>&1 || exit 1
+	openssl dgst -sha1 -sign $BUILDDIR/keys/$PRIVKEY -out $repo/armhf/$signed $untrusted || exit 1
 	tar -c -O -C $repo/armhf $signed | $TOP/build/tools/abuild-tar --cut | gzip -9 > $sig
 	cat $sig $untrusted > $index
 	rm -rf $untrusted $sig $repo/armhf/$signed
 }
 
-mkdir -p $TOP/build/downloads/ || exit 1
+rm -rf $BUILDDIR/rootfs
+rm -rf $BUILDDIR/downloads
 
-download_and_unpack "http://dl-cdn.alpinelinux.org/alpine/v3.9/releases/armhf/alpine-rpi-3.9.4-armhf.tar.gz" $TOP/build/rootfs
-add_apk alsa-lib-1.1.8-r0.apk $TOP/build/rootfs/pimodem/
-add_apk alsa-lib-dev-1.1.8-r0.apk $TOP/build/rootfs/pimodem/
-add_apk pkgconf-1.6.0-r0.apk $TOP/build/rootfs/pimodem/
-generate_index $TOP/build/rootfs/pimodem/
-cp $TOP/build/pimodem.apkovl.tar.gz $TOP/build/rootfs
+mkdir -p $TOP/build/downloads/ || exit 1
+mkdir -p $TOP/build/rootfs/ || exit 1
+
+download_and_unpack "http://dl-cdn.alpinelinux.org/alpine/v3.9/releases/armhf/alpine-rpi-3.9.4-armhf.tar.gz" $BUILDDIR/rootfs || exit 1
+add_apk alsa-lib-1.1.8-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
+add_apk alsa-lib-dev-1.1.8-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
+add_apk pkgconf-1.6.0-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
+add_apk dropbear-2018.76-r2.apk  $BUILDDIR/rootfs/pimodem/ || exit 1
+add_apk dropbear-openrc-2018.76-r2.apk $BUILDDIR/rootfs/pimodem/ || exit 1
+add_apk sudo-1.8.25_p1-r2.apk $BUILDDIR/rootfs/pimodem/ || exit 1
+cp $BUILDDIR/$PKGNAME/pimodem-1.0.0-r0.apk $BUILDDIR/rootfs/pimodem/armhf || exit 1
+generate_index $BUILDDIR/rootfs/pimodem/ || exit 1
+cp $BUILDDIR/pimodem.apkovl.tar.gz $BUILDDIR/rootfs
 
 exit 0

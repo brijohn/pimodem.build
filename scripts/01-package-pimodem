@@ -2,6 +2,18 @@
 
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
 
+if [ ! -f $TOP/scripts/functions.sh ]; then
+	echo "Failed to source functions.sh" && exit 1
+else
+	. $TOP/scripts/functions.sh
+fi
+
+# Go cross compile options
+export GOARCH=arm
+export CGOCC=arm-linux-musleabihf-gcc
+export CGO_CFLAGS="-g -O2 -I/opt/cross/include"
+export CGO_LDFLAGS="-g -O2 -L/opt/cross/lib"
+
 PACKAGE=github.com/brijohn/pimodem
 
 install_pimodem() {
@@ -9,33 +21,77 @@ install_pimodem() {
 	local logdest=$2
 	local port=$3
 	local ipaddr=$4
-	mkdir -p $TOP/build/pimodem/etc/init.d || exit 1
-	mkdir -p $TOP/build/pimodem/etc/conf.d || exit 1
-	mkdir -p $TOP/build/pimodem/usr/sbin || exit 1
-	git submodule update --init pimodem || exit 1
-	GOARCH=arm CGOCC=arm-linux-musleabihf-gcc CGO_CFLAGS="-g -O2 -I/opt/cross/include" CGO_LDFLAGS="-g -O2 -L/opt/cross/lib" make --no-print-directory -C $TOP/pimodem
+	mkdir -p $BUILDDIR/$PKGNAME/data/etc/init.d || return $?
+	mkdir -p $BUILDDIR/$PKGNAME/data/etc/conf.d || return $?
+	mkdir -p $BUILDDIR/$PKGNAME/data/usr/sbin || return $?
+	git submodule update --init pimodem || return $?
+	make --no-print-directory -C $TOP/pimodem || return $?
+	install -m 755 -D -t $BUILDDIR/$PKGNAME/data/usr/sbin $TOP/pimodem/src/bin/$PACKAGE || return $?
+	cat > "$BUILDDIR/$PKGNAME/data/etc/conf.d/pimodem" <<-OPENRC-CONF
+		SERIAL=${serial}
+		LOGDEST=${logdest}
+		PORT=${port}
+		IPADDR=${ipaddr}
+	OPENRC-CONF
+	cat > "$BUILDDIR/$PKGNAME/data/etc/init.d/pimodem" <<-'OPENRC-INIT'
+		#!/sbin/openrc-run
 
-	install -m 755 -D -t $TOP/build/pimodem/usr/sbin $TOP/pimodem/src/bin/$PACKAGE || exit 1
-	cat <<OPENRC-CONF > $TOP/build/pimodem/etc/conf.d/pimodem
-SERIAL=${serial}
-LOGDEST=${logdest}
-PORT=${port}
-IPADDR=${ipaddr}
-OPENRC-CONF
-	cat <<'OPENRC-INIT' > $TOP/build/pimodem/etc/init.d/pimodem
-#!/sbin/openrc-run
+		command=/usr/sbin/pimodem
+		command_args="-d ${SERIAL} --logger=${LOGDEST} --port=${PORT} --ip=${IPADDR}"
+		command_background=true
+		pidfile="/var/run/${RC_SVCNAME}.pid"
 
-command=/usr/sbin/pimodem
-command_args="-d ${SERIAL} --logger=${LOGDEST} --port=${PORT} --ip=${IPADDR}"
-command_background=true
-pidfile="/var/run/${RC_SVCNAME}.pid"
-
-depend() {
-	need net
-	want logger
+		depend() {
+		    need net
+		    want logger
+		}
+	OPENRC-INIT
+	chmod 755 "$BUILDDIR/$PKGNAME/data/etc/init.d/pimodem" || return $?
 }
-OPENRC-INIT
+
+generate_metafiles() {
+	local pkginfo=$BUILDDIR/$PKGNAME/metadata/.PKGINFO
+	local builddate=$(date -u "+%s")
+	local size=$(du -sk $BUILDDIR/$PKGNAME/data | awk '{print $1 * 1024}')
+	mkdir -p $BUILDDIR/$PKGNAME/metadata || return $?
+	cat > "$pkginfo" <<-EOF
+		pkgname = $PKGNAME
+		pkgver = $PKGVER-$PKGREV
+		pkgdesc = Hayes compatable modem emualtor for the raspberry pi
+		url = http://github.com/brijohn/pimodem
+		maintainer = $MAINTAINER
+		packager = $PACKAGER
+		builddate = $builddate
+		size = $size
+		arch = armhf
+		origin = $PKGNAME
+		license = GPL-2.0
+		depend = alsa-lib
+		commit = $(last_commit $TOP/pimodem)
+	EOF
 }
 
-install_pimodem /dev/ttyAMA0 syslog 6400 0.0.0.0
+create_apk() {
+	local pkginfo=$BUILDDIR/$PKGNAME/metadata/.PKGINFO
+	local apk="$PKGNAME-$PKGVER-$PKGREV.apk"
+	pushd $BUILDDIR/$PKGNAME/data/ >/dev/null
+	tar --xattrs -f - -c * | abuild-tar --hash | gzip -9 >"$BUILDDIR/$PKGNAME/data.tar.gz"
+	popd >/dev/null
+	local sha256=$(sha256sum "$BUILDDIR/$PKGNAME/data.tar.gz" | cut -f1 -d' ')
+	echo "datahash = $sha256" >> "$pkginfo"
+	pushd $BUILDDIR/$PKGNAME/metadata/ >/dev/null
+	tar -f - -c $(basename $pkginfo) | abuild-tar --cut \
+			| gzip -9 > "$BUILDDIR/$PKGNAME/control.tar.gz"
+	popd >/dev/null
+	do_sign $BUILDDIR/$PKGNAME/control.tar.gz
+	cat $BUILDDIR/$PKGNAME/control.tar.gz $BUILDDIR/$PKGNAME/data.tar.gz > "$BUILDDIR/$PKGNAME/$apk"
+}
 
+rm -rf $BUILDDIR/$PKGNAME
+mkdir -p $BUILDDIR/$PKGNAME || exit 1
+
+install_pimodem /dev/ttyAMA0 syslog 6400 0.0.0.0 || exit 1
+generate_metafiles || exit 1
+create_apk || exit 1
+
+exit 0

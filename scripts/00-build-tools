@@ -2,17 +2,31 @@
 
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
 
+if [ ! -f $TOP/scripts/functions.sh ]; then
+	echo "Failed to source functions.sh" && exit 1
+else
+	. $TOP/scripts/functions.sh
+fi
+
 declare -A TOOLS=( [abuild]="abuild-tar" [apk-tools]="src/apk" )
+
+generate_keys() {
+	local hash=$(last_commit $TOP 8)
+	mkdir -p $TOP/build/keys || return $?
+	openssl genrsa -out $BUILDDIR/keys/$PRIVKEY 2048 >/dev/null 2>&1 || return $?
+	openssl rsa -in $BUILDDIR/keys/$PRIVKEY -pubout -out $BUILDDIR/keys/$PUBKEY >/dev/null 2>&1 || return $?
+}
 
 install_tool() {
 	local tool=$1
-	mkdir -p $TOP/build/tools || exit 1
-	git submodule update --init $tool || exit 1
-	CFLAGS=-Werror=unused-result LUAAPK= make --no-print-directory -C $TOP/$tool || exit 1
-	cp $TOP/$tool/${TOOLS[$tool]} $TOP/build/tools || exit 1
+	mkdir -p $BUILDDIR/tools || return $?
+	git submodule update --init $tool || return $?
+	CFLAGS=-Werror=unused-result LUAAPK= make --no-print-directory -s -C $TOP/$tool || return $?
+	cp $TOP/$tool/${TOOLS[$tool]} $BUILDDIR/tools || return $?
 }
 
-install_tool abuild
-install_tool apk-tools
+generate_keys || exit 1
+install_tool abuild || exit 1
+install_tool apk-tools || exit 1
 
 exit 0

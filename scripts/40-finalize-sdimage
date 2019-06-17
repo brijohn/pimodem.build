@@ -2,6 +2,12 @@
 
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
 
-mcopy -s -b -i $TOP/build/pimodem.img $TOP/build/rootfs/* ::
+if [ ! -f $TOP/scripts/functions.sh ]; then
+	echo "Failed to source functions.sh" && exit 1
+else
+	. $TOP/scripts/functions.sh
+fi
+
+mcopy -s -b -i $BUILDDIR/pimodem.img@@1M $BUILDDIR/rootfs/* :: || exit 1
 
 exit 0

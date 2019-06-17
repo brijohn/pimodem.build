@@ -1,134 +1,152 @@
 #!/bin/bash
 
 TOP=$(readlink -f $(dirname ${BASH_SOURCE:-$0})/..)
-PACKAGE=/github.com/brijohn/pimodem
 
-install_pimodem() {
-	local serial=$1
-	local logdest=$2
-	local port=$3
-	local ipaddr=$4
-	mkdir -p $TOP/build/apkovl/etc/init.d || exit 1
-	mkdir -p $TOP/build/apkovl/etc/conf.d || exit 1
-	install -m 755 -D -t $TOP/build/apkovl/usr/sbin $TOP/src/bin/$PACKAGE || exit 1
-	cat <<OPENRC-CONF > $TOP/build/apkovl/etc/conf.d/pimodem
-SERIAL=${serial}
-LOGDEST=${logdest}
-PORT=${port}
-IPADDR=${ipaddr}
-OPENRC-CONF
-	cat <<'OPENRC-INIT' > $TOP/build/apkovl/etc/init.d/pimodem
-#!/sbin/openrc-run
-
-command=/usr/sbin/pimodem
-command_args="-d ${SERIAL} --logger=${LOGDEST} --port=${PORT} --ip=${IPADDR}"
-command_background=true
-pidfile="/var/run/${RC_SVCNAME}.pid"
-
-depend() {
-	need net
-	want logger
-}
-OPENRC-INIT
-}
+if [ ! -f $TOP/scripts/functions.sh ]; then
+	echo "Failed to source functions.sh" && exit 1
+else
+	. $TOP/scripts/functions.sh
+fi
 
 setup_lbu() {
-	mkdir -p $TOP/build/apkovl/etc/lbu/
-	cat <<FSTAB > $TOP/build/apkovl/etc/fstab
-/dev/mmcblk0 /media/mmcblk0 vfat ro,relatime,fmask=0022,dmask=0022,errors=remount-ro 0 0
-FSTAB
-	cat <<LBU > $TOP/build/apkovl/etc/lbu/lbu.conf
-DEFAULT_CIPHER=aes-256-cbc
-LBU_MEDIA=mmcblk0
-LBU
+	mkdir -p $BUILDDIR/apkovl/etc/lbu/ || return $?
+	cat > $BUILDDIR/apkovl/etc/fstab <<-FSTAB
+		/dev/mmcblk0p1 /media/mmcblk0p1 vfat ro,relatime,fmask=0022,dmask=0022,errors=remount-ro 0 0
+	FSTAB
+	cat > $BUILDDIR/apkovl/etc/lbu/lbu.conf <<-LBU
+		DEFAULT_CIPHER=aes-256-cbc
+		LBU_MEDIA=mmcblk0p1
+	LBU
+}
+
+setup_rc_local() {
+	mkdir -p $BUILDDIR/apkovl/etc/local.d || return $?
+	cat > "$BUILDDIR/apkovl/etc/local.d/01-create-user.start" <<-'RCUSER'
+		#!/bin/ash
+
+		read_password() {
+		    echo -n $(dd if=./nvmem skip=3584 bs=1 count=106 status=noxfer 2> /dev/null)
+		}
+
+		getent passwd admin >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+		    adduser -D admin
+		    echo 'admin:$6$HfloMqHIZP$1ynCNdXsTwNAnqlkvG7BK.qzITuvfO.8S1OiFnMYFjoeM8rIMa7fGuj4nz61AZFC5Mshiq6j/5Goo9/3ur1H91' | chpasswd -e
+		fi
+		passwd -l root
+	RCUSER
+	chmod 755 "$BUILDDIR/apkovl/etc/local.d/01-create-user.start"
+	cat > "$BUILDDIR/apkovl/etc/local.d/02-configure-network.start" <<-'RCNETWORK'
+		#!/bin/ash
+
+		read_ipv4() {
+		    local offset=$1
+		    local ip=$(dd if=./nvmem skip=$offset bs=1 count=4 status=noxfer 2> /dev/null | xxd -p)
+		    printf "%d.%d.%d.%d" "0x${ip:0:2}" "0x${ip:2:2}" "0x${ip:4:2}" "0x${ip:6:2}"
+		}
+
+		dns=8.8.8.8
+		echo "nameserver $dns" > /etc/resolv.conf
+		ipaddr=0.0.0.0
+		echo "auto eth0" >> /etc/network/interfaces
+		if [ "$ipaddr" = "0.0.0.0" ]; then
+		    echo "iface eth0 inet dhcp" >> /etc/network/interfaces
+		else
+		    gateway=172.16.0.1
+		    netmask=255.255.255.0
+		    echo "iface eth0 inet static" >> /etc/network/interfaces
+		    echo "    address $ipaddr" >> /etc/network/interfaces
+		    echo "    netmask $netmask" >> /etc/network/interfaces
+		    echo "    gateway $gateway" >> /etc/network/interfaces
+		fi
+	RCNETWORK
+	chmod 755 "$BUILDDIR/apkovl/etc/local.d/02-configure-network.start"
 }
 
 setup_network() {
-	mkdir -p $TOP/build/apkovl/etc/network/
-	cat <<ETH0 > $TOP/build/apkovl/etc/network/interfaces
-auto lo
-iface lo inet loopback
+	mkdir -p $BUILDDIR/apkovl/etc/network/ || return $?
+	cat > $BUILDDIR/apkovl/etc/network/interfaces <<-INTF
+		auto lo
+		iface lo inet loopback
 
-auto eth0
-iface eth0 inet dhcp
-ETH0
+	INTF
 
-	cat <<RESOLV > $TOP/build/apkovl/etc/resolv.conf
-nameserver 8.8.8.8
-RESOLV
+	cat > $BUILDDIR/apkovl/etc/hostname <<-HOSTNAME
+		pimodem
+	HOSTNAME
 
-	cat <<HOSTNAME > $TOP/build/apkovl/etc/hostname
-pimodem
-HOSTNAME
-
-	cat <<HOSTS > $TOP/build/apkovl/etc/hosts
-127.0.0.1	pimodem
-HOSTS
-}
-
-generate_keys() {
-	mkdir -p $TOP/build/keys || exit 1
-	mkdir -p $TOP/build/apkovl/etc/apk/keys || exit 1
-	openssl genrsa -out $TOP/build/keys/brijohn@gmail.com 2048 >/dev/null 2>&1 || exit 1
-	openssl rsa -in $TOP/build/keys/brijohn@gmail.com -pubout -out $TOP/build/keys/brijohn@gmail.com.pub >/dev/null 2>&1 || exit 1
-	cp $TOP/build/keys/brijohn@gmail.com.pub $TOP/build/apkovl/etc/apk/keys || exit 1
+	cat > $BUILDDIR/apkovl/etc/hosts <<-HOSTS
+		127.0.0.1	pimodem
+	HOSTS
 }
 
 setup_keymap() {
 	local layout=$1
 	local variant=$2
-	mkdir -p $TOP/build/apkovl/etc/keymap || exit 1
-	mkdir -p $TOP/build/apkovl/etc/conf.d || exit 1
-	ln -sf /usr/share/bkeymaps/${layout}/${variant}.bmap.gz $TOP/build/apkovl/etc/keymap/${variant}.bmap.gz || exit 1¬
-	cat <<LOADKMAP > $TOP/build/apkovl/etc/conf.d/loadkmap
-KEYMAP=/etc/keymap/${variant}.bmap.gz
-LOADKMAP
+	mkdir -p $BUILDDIR/apkovl/etc/keymap || return $?
+	mkdir -p $BUILDDIR/apkovl/etc/conf.d || return $?
+	ln -sf /usr/share/bkeymaps/${layout}/${variant}.bmap.gz $BUILDDIR/apkovl/etc/keymap/${variant}.bmap.gz || return $?
+	cat > $BUILDDIR/apkovl/etc/conf.d/loadkmap <<-LOADKMAP
+		KEYMAP=/etc/keymap/${variant}.bmap.gz
+	LOADKMAP
 }
 
 configure_run_levels() {
-	mkdir -p $TOP/build/apkovl/etc/runlevels/boot || exit 1
-	mkdir -p $TOP/build/apkovl/etc/runlevels/default || exit 1
-	ln -sf /etc/init.d/urandom $TOP/build/apkovl/etc/runlevels/boot/urandom || exit 1
-	ln -sf /etc/init.d/networking $TOP/build/apkovl/etc/runlevels/boot/networking || exit 1
-	ln -sf /etc/init.d/loadkmap $TOP/build/apkovl/etc/runlevels/boot/loadkmap || exit 1
-	ln -sf /etc/init.d/swclock $TOP/build/apkovl/etc/runlevels/boot/swclock || exit 1
-	ln -sf /etc/init.d/modloop $TOP/build/apkovl/etc/runlevels/boot/modloop || exit 1
-	ln -sf /etc/init.d/chronyd $TOP/build/apkovl/etc/runlevels/default/chronyd || exit 1
-	ln -sf /etc/init.d/crond $TOP/build/apkovl/etc/runlevels/default/crond || exit 1
-	ln -sf /etc/init.d/acpid $TOP/build/apkovl/etc/runlevels/default/acpid || exit 1
-	ln -sf /etc/init.d/pimodem $TOP/build/apkovl/etc/runlevels/default/pimodem || exit 1
+	mkdir -p $BUILDDIR/apkovl/etc/runlevels/sysinit || return $?
+	mkdir -p $BUILDDIR/apkovl/etc/runlevels/boot || return $?
+	mkdir -p $BUILDDIR/apkovl/etc/runlevels/default || return $?
+	ln -sf /etc/init.d/urandom $BUILDDIR/apkovl/etc/runlevels/boot/urandom || return $?
+	ln -sf /etc/init.d/networking $BUILDDIR/apkovl/etc/runlevels/boot/networking || return $?
+	ln -sf /etc/init.d/loadkmap $BUILDDIR/apkovl/etc/runlevels/boot/loadkmap || return $?
+	ln -sf /etc/init.d/swclock $BUILDDIR/apkovl/etc/runlevels/boot/swclock || return $?
+	ln -sf /etc/init.d/modloop $BUILDDIR/apkovl/etc/runlevels/boot/modloop || return $?
+	ln -sf /etc/init.d/local $BUILDDIR/apkovl/etc/runlevels/sysinit/local || return $?
+	ln -sf /etc/init.d/chronyd $BUILDDIR/apkovl/etc/runlevels/default/chronyd || return $?
+	ln -sf /etc/init.d/crond $BUILDDIR/apkovl/etc/runlevels/default/crond || return $?
+	ln -sf /etc/init.d/dropbear $BUILDDIR/apkovl/etc/runlevels/default/dropbear || return $?
+	ln -sf /etc/init.d/acpid $BUILDDIR/apkovl/etc/runlevels/default/acpid || return $?
+	ln -sf /etc/init.d/pimodem $BUILDDIR/apkovl/etc/runlevels/default/pimodem || return $?
 }
 
 configure_world() {
-	mkdir -p $TOP/build/apkovl/etc/apk || exit 1
-	echo "/media/mmcblk0/apks" >> $TOP/build/apkovl/etc/apk/repositories
-	echo "/media/mmcblk0/pimodem" >> $TOP/build/apkovl/etc/apk/repositories
-	echo "alpine-base" >> $TOP/build/apkovl/etc/apk/world
-	echo "alsa-lib" >> $TOP/build/apkovl/etc/apk/world
-	echo "alsa-lib-dev" >> $TOP/build/apkovl/etc/apk/world
-	echo "chrony" >> $TOP/build/apkovl/etc/apk/world
-	echo "kbd-bkeymaps" >> $TOP/build/apkovl/etc/apk/world
-	echo "openssl" >> $TOP/build/apkovl/etc/apk/world
-	echo "tzdata" >> $TOP/build/apkovl/etc/apk/world
+	mkdir -p $BUILDDIR/apkovl/etc/apk || return $?
+	echo "/media/mmcblk0p1/apks" >> $BUILDDIR/apkovl/etc/apk/repositories || return $?
+	echo "/media/mmcblk0p1/pimodem" >> $BUILDDIR/apkovl/etc/apk/repositories || return $?
+	echo "alpine-base" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "alsa-lib" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "alsa-lib-dev" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "chrony" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "dropbear" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "kbd-bkeymaps" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "openssl" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo $PKGNAME >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo sudo >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "tzdata" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 }
 
 configure_timezone() {
 	tz=$1
-	ln -sf /usr/share/zoneinfo/${tz} $TOP/build/apkovl/etc/localtime
+	ln -sf /usr/share/zoneinfo/${tz} $BUILDDIR/apkovl/etc/localtime || return $?
 }
 
-rm -rf $TOP/build/apkovl
-mkdir -p $TOP/build/apkovl/ || exit 1
+configure_sudoers() {
+	echo "%admin ALL=(ALL) ALL" >> $BUILDDIR/apkovl/etc/sudoers
+	chmod 440 $BUILDDIR/apkovl/etc/sudoers || return $?
+}
 
-# install_pimodem /dev/ttyAMA0 syslog 6400 0.0.0.0
-setup_network
-configure_world
-generate_keys
-configure_run_levels
-configure_timezone UTC
-setup_keymap us us
-setup_lbu
+rm -rf $BUILDDIR/apkovl
+mkdir -p $BUILDDIR/apkovl/ || exit 1
+install -m 755 -D -t $BUILDDIR/apkovl/etc/apk/keys $BUILDDIR/keys/*.pub || exit 1
 
-tar czf $TOP/build/pimodem.apkovl.tar.gz -C $TOP/build/apkovl . || exit 1
+setup_network || exit 1
+configure_world || exit 1
+configure_run_levels || exit 1
+configure_timezone UTC || exit 1
+setup_keymap us us || exit 1
+setup_lbu || exit 1
+setup_rc_local || exit 1
+configure_sudoers || exit 1
+
+tar czf $BUILDDIR/pimodem.apkovl.tar.gz -C $BUILDDIR/apkovl . || exit 1
 
 exit 0
