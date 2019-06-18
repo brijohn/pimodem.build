@@ -17,6 +17,9 @@ image: ; $(info $(M) building pimodem image…)
 		msg=$${msg//[-]/ } ; \
 		printf "\033[34;1m▶\033[0m $$msg…\n" ; \
 		$(FAKEROOT) $$f ; \
+		if [ $$? -ne 0 ]; then \
+			exit 1 ; \
+		fi \
 	done
 
 .PHONY: clean
