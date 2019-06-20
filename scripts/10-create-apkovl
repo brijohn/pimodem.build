@@ -96,6 +96,7 @@ configure_run_levels() {
 	mkdir -p $BUILDDIR/apkovl/etc/runlevels/boot || return $?
 	mkdir -p $BUILDDIR/apkovl/etc/runlevels/default || return $?
 	ln -sf /etc/init.d/urandom $BUILDDIR/apkovl/etc/runlevels/boot/urandom || return $?
+	ln -sf /etc/init.d/modules $BUILDDIR/apkovl/etc/runlevels/boot/modules || return $?
 	ln -sf /etc/init.d/networking $BUILDDIR/apkovl/etc/runlevels/boot/networking || return $?
 	ln -sf /etc/init.d/loadkmap $BUILDDIR/apkovl/etc/runlevels/boot/loadkmap || return $?
 	ln -sf /etc/init.d/swclock $BUILDDIR/apkovl/etc/runlevels/boot/swclock || return $?
@@ -134,6 +135,10 @@ configure_sudoers() {
 	chmod 440 $BUILDDIR/apkovl/etc/sudoers || return $?
 }
 
+configure_modules() {
+	echo "ledtrig-netdev" >> $BUILDDIR/apkovl/etc/modules
+}
+
 rm -rf $BUILDDIR/apkovl
 mkdir -p $BUILDDIR/apkovl/ || exit 1
 install -m 755 -D -t $BUILDDIR/apkovl/etc/apk/keys $BUILDDIR/keys/*.pub || exit 1
@@ -146,6 +151,7 @@ setup_keymap us us || exit 1
 setup_lbu || exit 1
 setup_rc_local || exit 1
 configure_sudoers || exit 1
+configure_modules || exit 1
 
 tar czf $BUILDDIR/pimodem.apkovl.tar.gz -C $BUILDDIR/apkovl . || exit 1
 
