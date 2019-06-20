@@ -19,6 +19,18 @@ setup_lbu() {
 	LBU
 }
 
+add_sysfs_conf() {
+	mkdir -p $BUILDDIR/apkovl/etc/init.d/ || return $?
+	cat > $BUILDDIR/apkovl/etc/sysfs.conf <<-'SYSFSCONF'
+		class/leds/network:act/trigger = netdev
+		class/leds/network:act/rx = 1
+		class/leds/network:act/tx = 1
+		class/leds/network:act/device_name = eth0
+		owner class/leds/network:act/device_name = admin:admin
+		owner bus/nvmem/devices/3-0500/nvmem = admin:admin
+	SYSFSCONF
+}
+
 setup_rc_local() {
 	mkdir -p $BUILDDIR/apkovl/etc/local.d || return $?
 	cat > "$BUILDDIR/apkovl/etc/local.d/01-create-user.start" <<-'RCUSER'
@@ -101,6 +113,7 @@ configure_run_levels() {
 	ln -sf /etc/init.d/loadkmap $BUILDDIR/apkovl/etc/runlevels/boot/loadkmap || return $?
 	ln -sf /etc/init.d/swclock $BUILDDIR/apkovl/etc/runlevels/boot/swclock || return $?
 	ln -sf /etc/init.d/modloop $BUILDDIR/apkovl/etc/runlevels/boot/modloop || return $?
+	ln -sf /etc/init.d/sysfsconf $BUILDDIR/apkovl/etc/runlevels/boot/sysfsconf || return $?
 	ln -sf /etc/init.d/local $BUILDDIR/apkovl/etc/runlevels/sysinit/local || return $?
 	ln -sf /etc/init.d/chronyd $BUILDDIR/apkovl/etc/runlevels/default/chronyd || return $?
 	ln -sf /etc/init.d/crond $BUILDDIR/apkovl/etc/runlevels/default/crond || return $?
@@ -143,6 +156,7 @@ rm -rf $BUILDDIR/apkovl
 mkdir -p $BUILDDIR/apkovl/ || exit 1
 install -m 755 -D -t $BUILDDIR/apkovl/etc/apk/keys $BUILDDIR/keys/*.pub || exit 1
 
+add_sysfs_conf || exit 1
 setup_network || exit 1
 configure_world || exit 1
 configure_run_levels || exit 1
