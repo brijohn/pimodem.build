@@ -73,6 +73,15 @@ setup_rc_local() {
 		fi
 	RCNETWORK
 	chmod 755 "$BUILDDIR/apkovl/etc/local.d/02-configure-network.start"
+	cat > "$BUILDDIR/apkovl/etc/local.d/03-add-mdev-entries.start" <<-'MDEV'
+		#!/bin/ash
+
+		echo "gpiomem		root:admin 0660" >> /etc/mdev.conf
+		echo "ttyAMA0		root:admin 0660" >> /etc/mdev.conf
+
+		/sbin/mdev -s
+	MDEV
+	chmod 755 "$BUILDDIR/apkovl/etc/local.d/03-add-mdev-entries.start"
 }
 
 setup_network() {
