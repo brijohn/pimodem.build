@@ -74,5 +74,5 @@ add_apk sudo-1.8.27-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
 cp $BUILDDIR/$PKGNAME/pimodem-1.0.0-r0.apk $BUILDDIR/rootfs/pimodem/armhf || exit 1
 generate_index $BUILDDIR/rootfs/pimodem/ || exit 1
 cp $BUILDDIR/pimodem.apkovl.tar.gz $BUILDDIR/rootfs
-
+echo "modules=loop,squashfs,sd-mod,usb-storage quiet console=tty1 iomem=relaxed" > $BUILDDIR/rootfs/cmdline.txt
 exit 0
