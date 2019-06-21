@@ -108,12 +108,12 @@ configure_run_levels() {
 	mkdir -p $BUILDDIR/apkovl/etc/runlevels/boot || return $?
 	mkdir -p $BUILDDIR/apkovl/etc/runlevels/default || return $?
 	ln -sf /etc/init.d/urandom $BUILDDIR/apkovl/etc/runlevels/boot/urandom || return $?
-	ln -sf /etc/init.d/modules $BUILDDIR/apkovl/etc/runlevels/boot/modules || return $?
 	ln -sf /etc/init.d/networking $BUILDDIR/apkovl/etc/runlevels/boot/networking || return $?
 	ln -sf /etc/init.d/loadkmap $BUILDDIR/apkovl/etc/runlevels/boot/loadkmap || return $?
 	ln -sf /etc/init.d/swclock $BUILDDIR/apkovl/etc/runlevels/boot/swclock || return $?
-	ln -sf /etc/init.d/modloop $BUILDDIR/apkovl/etc/runlevels/boot/modloop || return $?
 	ln -sf /etc/init.d/sysfsconf $BUILDDIR/apkovl/etc/runlevels/boot/sysfsconf || return $?
+	ln -sf /etc/init.d/modules $BUILDDIR/apkovl/etc/runlevels/sysinit/modules || return $?
+	ln -sf /etc/init.d/modloop $BUILDDIR/apkovl/etc/runlevels/sysinit/modloop || return $?
 	ln -sf /etc/init.d/local $BUILDDIR/apkovl/etc/runlevels/sysinit/local || return $?
 	ln -sf /etc/init.d/chronyd $BUILDDIR/apkovl/etc/runlevels/default/chronyd || return $?
 	ln -sf /etc/init.d/crond $BUILDDIR/apkovl/etc/runlevels/default/crond || return $?
@@ -150,6 +150,9 @@ configure_sudoers() {
 
 configure_modules() {
 	echo "ledtrig-netdev" >> $BUILDDIR/apkovl/etc/modules
+	echo "at24" >> $BUILDDIR/apkovl/etc/modules
+	echo "snd_soc_pcm5102a" >> $BUILDDIR/apkovl/etc/modules
+	echo "snd-soc-rpi-simple-soundcard" >> $BUILDDIR/apkovl/etc/modules
 }
 
 rm -rf $BUILDDIR/apkovl
