@@ -27,7 +27,7 @@ add_sysfs_conf() {
 		class/leds/network:act/tx = 1
 		class/leds/network:act/device_name = eth0
 		owner class/leds/network:act/device_name = admin:admin
-		owner bus/nvmem/devices/3-0500/nvmem = admin:admin
+		owner bus/nvmem/devices/3-00500/nvmem = admin:admin
 	SYSFSCONF
 }
 
