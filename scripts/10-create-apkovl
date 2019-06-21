@@ -37,13 +37,13 @@ setup_rc_local() {
 		#!/bin/ash
 
 		read_password() {
-		    echo -n $(dd if=./nvmem skip=3584 bs=1 count=106 status=noxfer 2> /dev/null)
+		    echo -n $(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=3584 bs=1 count=106 status=noxfer 2> /dev/null)
 		}
 
 		getent passwd admin >/dev/null 2>&1
 		if [ $? -ne 0 ]; then
 		    adduser -D admin
-		    echo 'admin:$6$HfloMqHIZP$1ynCNdXsTwNAnqlkvG7BK.qzITuvfO.8S1OiFnMYFjoeM8rIMa7fGuj4nz61AZFC5Mshiq6j/5Goo9/3ur1H91' | chpasswd -e
+		    echo "admin:$(read_password)" | chpasswd -e
 		fi
 		passwd -l root
 	RCUSER
@@ -53,19 +53,19 @@ setup_rc_local() {
 
 		read_ipv4() {
 		    local offset=$1
-		    local ip=$(dd if=./nvmem skip=$offset bs=1 count=4 status=noxfer 2> /dev/null | xxd -p)
+		    local ip=$(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=$offset bs=1 count=4 status=noxfer 2> /dev/null | xxd -p)
 		    printf "%d.%d.%d.%d" "0x${ip:0:2}" "0x${ip:2:2}" "0x${ip:4:2}" "0x${ip:6:2}"
 		}
 
-		dns=8.8.8.8
-		echo "nameserver $dns" > /etc/resolv.conf
-		ipaddr=0.0.0.0
+		ipaddr=$(read_ipv4 3690)
 		echo "auto eth0" >> /etc/network/interfaces
 		if [ "$ipaddr" = "0.0.0.0" ]; then
 		    echo "iface eth0 inet dhcp" >> /etc/network/interfaces
 		else
-		    gateway=172.16.0.1
-		    netmask=255.255.255.0
+		    dns=$(read_ipv4 3702)
+		    gateway=$(read_ipv4 3698)
+		    netmask=$(read_ipv4 3694)
+		    echo "nameserver $dns" > /etc/resolv.conf
 		    echo "iface eth0 inet static" >> /etc/network/interfaces
 		    echo "    address $ipaddr" >> /etc/network/interfaces
 		    echo "    netmask $netmask" >> /etc/network/interfaces
