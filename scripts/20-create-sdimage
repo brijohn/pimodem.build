@@ -15,10 +15,10 @@ create_image() {
 	mkfs.msdos -F32 $file >/dev/null 2>&1 || return $?
 	fallocate -i --offset=0 --length=1MiB $file || return $?
 	parted -s $file "mklabel msdos" || return $?
-	parted -s $file "mkpart primary fat32 0% 100%" || return $?
+	parted -s $file "mkpart primary fat32 1049kB 100%" || return $?
 	parted -s $file "set 1 boot on" || return $?
 }
 
-create_image pimodem.img 500 || exit 1
+create_image pimodem.img 100 || exit 1
 
 exit 0
