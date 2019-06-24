@@ -164,6 +164,16 @@ configure_modules() {
 	echo "snd-soc-rpi-simple-soundcard" >> $BUILDDIR/apkovl/etc/modules
 }
 
+generate_ssh_host_keys() {
+	mkdir -p $BUILDDIR/apkovl/etc/dropbear || return $?
+	keygen=$(which dropbearkey)
+	if [ $? -eq 0 ]; then
+		$keygen -t dss -s 1024 -f $BUILDDIR/apkovl/etc/dropbear/dropbear_dss_host_key >/dev/null 2>&1
+		$keygen -t rsa -s 2048 -f $BUILDDIR/apkovl/etc/dropbear/dropbear_rsa_host_key >/dev/null 2>&1
+		$keygen -t ecdsa -s 521 -f $BUILDDIR/apkovl/etc/dropbear/dropbear_ecdsa_host_key >/dev/null 2>&1
+	fi
+}
+
 rm -rf $BUILDDIR/apkovl
 mkdir -p $BUILDDIR/apkovl/ || exit 1
 install -m 755 -D -t $BUILDDIR/apkovl/etc/apk/keys $BUILDDIR/keys/*.pub || exit 1
@@ -178,6 +188,7 @@ setup_lbu || exit 1
 setup_rc_local || exit 1
 configure_sudoers || exit 1
 configure_modules || exit 1
+generate_ssh_host_keys || exit 1
 
 tar czf $BUILDDIR/pimodem.apkovl.tar.gz -C $BUILDDIR/apkovl . || exit 1
 
