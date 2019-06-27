@@ -43,6 +43,7 @@ setup_rc_local() {
 		getent passwd admin >/dev/null 2>&1
 		if [ $? -ne 0 ]; then
 		    adduser -D admin
+		    adduser admin audio
 		    echo "admin:$(read_password)" | chpasswd -e
 		fi
 		passwd -l root
@@ -136,6 +137,7 @@ configure_world() {
 	echo "/media/mmcblk0p1/apks" >> $BUILDDIR/apkovl/etc/apk/repositories || return $?
 	echo "/media/mmcblk0p1/pimodem" >> $BUILDDIR/apkovl/etc/apk/repositories || return $?
 	echo "alpine-base" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "alsa-utils" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo "alsa-lib" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo "alsa-lib-dev" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo "chrony" >> $BUILDDIR/apkovl/etc/apk/world || return $?
@@ -160,6 +162,7 @@ configure_sudoers() {
 configure_modules() {
 	echo "ledtrig-netdev" >> $BUILDDIR/apkovl/etc/modules
 	echo "at24" >> $BUILDDIR/apkovl/etc/modules
+	echo "snd_soc_bcm2835_i2s" >> $BUILDDIR/apkovl/etc/modules
 	echo "snd_soc_pcm5102a" >> $BUILDDIR/apkovl/etc/modules
 	echo "snd-soc-rpi-simple-soundcard" >> $BUILDDIR/apkovl/etc/modules
 }
