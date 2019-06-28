@@ -33,6 +33,8 @@ do_sign() {
 	popd >/dev/null
 }
 
+CGOCC=${CGOCC:-arm-linux-musleabihf-gcc}
+
 PKGNAME=pimodem
 PKGVER=1.0.0
 PKGREV=r0
@@ -42,3 +44,5 @@ PACKAGER=${PACKAGER:-$MAINTAINER}
 
 PRIVKEY="$EMAIL-$(last_commit $TOP 8).rsa"
 PUBKEY="$EMAIL-$(last_commit $TOP 8).rsa.pub"
+
+ALSA_VERSION=${ALSA_VERSION:-1.1.9}

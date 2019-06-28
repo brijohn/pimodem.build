@@ -59,7 +59,6 @@ generate_index() {
 }
 
 rm -rf $BUILDDIR/rootfs
-rm -rf $BUILDDIR/downloads
 
 mkdir -p $TOP/build/downloads/ || exit 1
 mkdir -p $TOP/build/rootfs/ || exit 1

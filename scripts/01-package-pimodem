@@ -10,11 +10,25 @@ fi
 
 # Go cross compile options
 export GOARCH=arm
-export CGOCC=arm-linux-musleabihf-gcc
-export CGO_CFLAGS="-g -O2 -I/opt/cross/include"
-export CGO_LDFLAGS="-g -O2 -L/opt/cross/lib"
+export CGOCC
+export CGO_CFLAGS="-g -O2 -I$TOP/build/libraries/usr/include"
+export CGO_LDFLAGS="-g -O2 -L$TOP/build/libraries/usr/lib"
 
 PACKAGE=github.com/brijohn/pimodem
+
+compile_alsa() {
+	local ver=$1
+	mkdir -p $TOP/build/downloads || return $?
+	wget -q -O $TOP/build/downloads/alsa-lib-${ver}.tar.bz2 ftp://ftp.alsa-project.org/pub/lib/alsa-lib-${ver}.tar.bz2 || return $?
+	tar jxvf $TOP/build/downloads/alsa-lib-${ver}.tar.bz2 -C $TOP/build/downloads >/dev/null 2>&1 || return $?
+	(
+	pushd $TOP/build/downloads/alsa-lib-${ver}
+	CC=${CGOCC} ./configure --host=arm-linux || exit 1
+	make --no-print-directory || exit 1
+	make install DESTDIR=$TOP/build/libraries/ || exit 1
+	popd
+	) >/dev/null 2>&1 || return $?
+}
 
 install_pimodem() {
 	local serial=$1
@@ -90,6 +104,7 @@ create_apk() {
 rm -rf $BUILDDIR/$PKGNAME
 mkdir -p $BUILDDIR/$PKGNAME || exit 1
 
+compile_alsa $ALSA_VERSION
 install_pimodem /dev/ttyAMA0 syslog 6400 0.0.0.0 || exit 1
 generate_metafiles || exit 1
 create_apk || exit 1
