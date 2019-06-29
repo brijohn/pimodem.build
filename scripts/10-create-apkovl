@@ -124,6 +124,7 @@ configure_run_levels() {
 	ln -sf /etc/init.d/sysfsconf $BUILDDIR/apkovl/etc/runlevels/boot/sysfsconf || return $?
 	ln -sf /etc/init.d/modules $BUILDDIR/apkovl/etc/runlevels/sysinit/modules || return $?
 	ln -sf /etc/init.d/modloop $BUILDDIR/apkovl/etc/runlevels/sysinit/modloop || return $?
+	ln -sf /etc/init.d/hwdrivers $BUILDDIR/apkovl/etc/runlevels/sysinit/hwdrivers || return $?
 	ln -sf /etc/init.d/local $BUILDDIR/apkovl/etc/runlevels/sysinit/local || return $?
 	ln -sf /etc/init.d/chronyd $BUILDDIR/apkovl/etc/runlevels/default/chronyd || return $?
 	ln -sf /etc/init.d/crond $BUILDDIR/apkovl/etc/runlevels/default/crond || return $?
@@ -161,10 +162,6 @@ configure_sudoers() {
 
 configure_modules() {
 	echo "ledtrig-netdev" >> $BUILDDIR/apkovl/etc/modules
-	echo "at24" >> $BUILDDIR/apkovl/etc/modules
-	echo "snd_soc_bcm2835_i2s" >> $BUILDDIR/apkovl/etc/modules
-	echo "snd_soc_pcm5102a" >> $BUILDDIR/apkovl/etc/modules
-	echo "snd-soc-rpi-simple-soundcard" >> $BUILDDIR/apkovl/etc/modules
 }
 
 generate_ssh_host_keys() {
