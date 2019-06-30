@@ -143,6 +143,7 @@ configure_world() {
 	echo "alsa-lib-dev" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo "chrony" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo "dropbear" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	echo "dropbear-scp" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo "kbd-bkeymaps" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo "openssl" >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo $PKGNAME >> $BUILDDIR/apkovl/etc/apk/world || return $?
