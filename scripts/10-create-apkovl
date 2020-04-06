@@ -136,6 +136,14 @@ setup_keymap() {
 	LOADKMAP
 }
 
+setup_watchdog() {
+	mkdir -p $BUILDDIR/apkovl/etc/conf.d || return $?
+	cat > $BUILDDIR/apkovl/etc/conf.d/watchdog <<-WATCHDOG
+		WATCHDOG_OPTS="-T 15 -t 5"
+		WATCHDOG_DEV="/dev/watchdog0"
+	WATCHDOG
+}
+
 configure_run_levels() {
 	mkdir -p $BUILDDIR/apkovl/etc/runlevels/sysinit || return $?
 	mkdir -p $BUILDDIR/apkovl/etc/runlevels/boot || return $?
@@ -154,6 +162,7 @@ configure_run_levels() {
 	ln -sf /etc/init.d/dropbear $BUILDDIR/apkovl/etc/runlevels/default/dropbear || return $?
 	ln -sf /etc/init.d/acpid $BUILDDIR/apkovl/etc/runlevels/default/acpid || return $?
 	ln -sf /etc/init.d/pimodem $BUILDDIR/apkovl/etc/runlevels/default/pimodem || return $?
+	ln -sf /etc/init.d/watchdog $BUILDDIR/apkovl/etc/runlevels/default/watchdog || return $?
 
 	if is_wireless_interface $INTERFACE; then
 		ln -sf /etc/init.d/wpa_supplicant $BUILDDIR/apkovl/etc/runlevels/boot/wpa_supplicant || return $?
@@ -223,6 +232,7 @@ setup_rc_local || exit 1
 configure_sudoers || exit 1
 configure_modules || exit 1
 generate_ssh_host_keys || exit 1
+setup_watchdog || exit 1
 
 if is_wireless_interface $INTERFACE; then
 	setup_wpa || exit 1
