@@ -9,6 +9,12 @@ if [ -f $TOP/build.config ]; then
 	. $TOP/build.config
 fi
 
+is_wireless_interface() {
+	local _interface=$1
+	local _regex="^wlan[0-9]+$"
+	[[ $_interface =~ $_regex ]]
+}
+
 last_commit() {
 	local gitpath"=$1"
 	local opts=
@@ -41,6 +47,10 @@ PKGREV=r0
 MAINTAINER="Brian Johnson"
 EMAIL=${EMAIL:-"pimodem@invalid.invalid"}
 PACKAGER=${PACKAGER:-$MAINTAINER}
+
+INTERFACE=${INTERFACE:-"eth0"}
+SSID=${SSID:-""}
+WPA_PSK=${WPA_PSK:-""}
 
 PRIVKEY="$EMAIL-$(last_commit $TOP 8).rsa"
 PUBKEY="$EMAIL-$(last_commit $TOP 8).rsa.pub"

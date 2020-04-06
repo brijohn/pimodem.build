@@ -21,11 +21,11 @@ setup_lbu() {
 
 add_sysfs_conf() {
 	mkdir -p $BUILDDIR/apkovl/etc/init.d/ || return $?
-	cat > $BUILDDIR/apkovl/etc/sysfs.conf <<-'SYSFSCONF'
+	cat > $BUILDDIR/apkovl/etc/sysfs.conf <<-SYSFSCONF
 		class/leds/network:act/trigger = netdev
 		class/leds/network:act/rx = 1
 		class/leds/network:act/tx = 1
-		class/leds/network:act/device_name = eth0
+		class/leds/network:act/device_name = $INTERFACE
 		owner class/leds/network:act/device_name = admin:admin
 		owner bus/nvmem/devices/3-00500/nvmem = admin:admin
 	SYSFSCONF
@@ -49,28 +49,28 @@ setup_rc_local() {
 		passwd -l root
 	RCUSER
 	chmod 755 "$BUILDDIR/apkovl/etc/local.d/01-create-user.start"
-	cat > "$BUILDDIR/apkovl/etc/local.d/02-configure-network.start" <<-'RCNETWORK'
+	cat > "$BUILDDIR/apkovl/etc/local.d/02-configure-network.start" <<-RCNETWORK
 		#!/bin/ash
 
 		read_ipv4() {
 		    local offset=$1
-		    local ip=$(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=$offset bs=1 count=4 status=noxfer 2> /dev/null | xxd -p)
-		    printf "%d.%d.%d.%d" "0x${ip:0:2}" "0x${ip:2:2}" "0x${ip:4:2}" "0x${ip:6:2}"
+		    local ip=\$(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=\$offset bs=1 count=4 status=noxfer 2> /dev/null | xxd -p)
+		    printf "%d.%d.%d.%d" "0x\${ip:0:2}" "0x\${ip:2:2}" "0x\${ip:4:2}" "0x\${ip:6:2}"
 		}
 
-		ipaddr=$(read_ipv4 3690)
-		echo "auto eth0" >> /etc/network/interfaces
-		if [ "$ipaddr" = "0.0.0.0" ]; then
-		    echo "iface eth0 inet dhcp" >> /etc/network/interfaces
+		ipaddr=\$(read_ipv4 3690)
+		echo "auto $INTERFACE" >> /etc/network/interfaces
+		if [ "\$ipaddr" = "0.0.0.0" ]; then
+		    echo "iface $INTERFACE inet dhcp" >> /etc/network/interfaces
 		else
-		    dns=$(read_ipv4 3702)
-		    gateway=$(read_ipv4 3698)
-		    netmask=$(read_ipv4 3694)
-		    echo "nameserver $dns" > /etc/resolv.conf
-		    echo "iface eth0 inet static" >> /etc/network/interfaces
-		    echo "    address $ipaddr" >> /etc/network/interfaces
-		    echo "    netmask $netmask" >> /etc/network/interfaces
-		    echo "    gateway $gateway" >> /etc/network/interfaces
+		    dns=\$(read_ipv4 3702)
+		    gateway=\$(read_ipv4 3698)
+		    netmask=\$(read_ipv4 3694)
+		    echo "nameserver \$dns" > /etc/resolv.conf
+		    echo "iface $INTERFACE inet static" >> /etc/network/interfaces
+		    echo "    address \$ipaddr" >> /etc/network/interfaces
+		    echo "    netmask \$netmask" >> /etc/network/interfaces
+		    echo "    gateway \$gateway" >> /etc/network/interfaces
 		fi
 	RCNETWORK
 	chmod 755 "$BUILDDIR/apkovl/etc/local.d/02-configure-network.start"
@@ -83,6 +83,25 @@ setup_rc_local() {
 		/sbin/mdev -s
 	MDEV
 	chmod 755 "$BUILDDIR/apkovl/etc/local.d/03-add-mdev-entries.start"
+}
+
+setup_wpa() {
+	if [[ -z "$SSID" ]]; then
+		echo "Must set an SSID when using a wireless interface."
+		return 1
+	else
+		mkdir -p $BUILDDIR/apkovl/etc/wpa_supplicant/ || return $?
+		if [[ -z "$WPA_PSK" ]]; then
+			cat > $BUILDDIR/apkovl/etc/wpa_supplicant/wpa_supplicant.conf <<-WPA
+				network={
+				    ssid="$SSID"
+				    key_mgmt=NONE
+				}
+			WPA
+		else
+			wpa_passphrase "$SSID" $WPA_PSK > $BUILDDIR/apkovl/etc/wpa_supplicant/wpa_supplicant.conf
+		fi
+	fi
 }
 
 setup_network() {
@@ -131,6 +150,10 @@ configure_run_levels() {
 	ln -sf /etc/init.d/dropbear $BUILDDIR/apkovl/etc/runlevels/default/dropbear || return $?
 	ln -sf /etc/init.d/acpid $BUILDDIR/apkovl/etc/runlevels/default/acpid || return $?
 	ln -sf /etc/init.d/pimodem $BUILDDIR/apkovl/etc/runlevels/default/pimodem || return $?
+
+	if is_wireless_interface $INTERFACE; then
+		ln -sf /etc/init.d/wpa_supplicant $BUILDDIR/apkovl/etc/runlevels/boot/wpa_supplicant || return $?
+	fi
 }
 
 configure_world() {
@@ -149,6 +172,11 @@ configure_world() {
 	echo $PKGNAME >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo sudo >> $BUILDDIR/apkovl/etc/apk/world || return $?
 	echo "tzdata" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+
+	if is_wireless_interface $INTERFACE; then
+		echo "wireless-tools" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+		echo "wpa_supplicant" >> $BUILDDIR/apkovl/etc/apk/world || return $?
+	fi
 }
 
 configure_timezone() {
@@ -190,6 +218,10 @@ setup_rc_local || exit 1
 configure_sudoers || exit 1
 configure_modules || exit 1
 generate_ssh_host_keys || exit 1
+
+if is_wireless_interface $INTERFACE; then
+	setup_wpa || exit 1
+fi
 
 tar czf $BUILDDIR/pimodem.apkovl.tar.gz -C $BUILDDIR/apkovl . || exit 1
 
