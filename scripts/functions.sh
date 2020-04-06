@@ -48,6 +48,8 @@ MAINTAINER="Brian Johnson"
 EMAIL=${EMAIL:-"pimodem@invalid.invalid"}
 PACKAGER=${PACKAGER:-$MAINTAINER}
 
+LOGLEVEL=${LOGLEVEL:-"info"}
+
 INTERFACE=${INTERFACE:-"eth0"}
 SSID=${SSID:-""}
 WPA_PSK=${WPA_PSK:-""}

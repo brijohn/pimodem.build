@@ -33,8 +33,9 @@ compile_alsa() {
 install_pimodem() {
 	local serial=$1
 	local logdest=$2
-	local port=$3
-	local ipaddr=$4
+	local loglevel=$3
+	local port=$4
+	local ipaddr=$5
 	mkdir -p $BUILDDIR/$PKGNAME/data/etc/init.d || return $?
 	mkdir -p $BUILDDIR/$PKGNAME/data/etc/conf.d || return $?
 	mkdir -p $BUILDDIR/$PKGNAME/data/usr/sbin || return $?
@@ -46,12 +47,13 @@ install_pimodem() {
 		LOGDEST=${logdest}
 		PORT=${port}
 		IPADDR=${ipaddr}
+		LOGLEVEL=${loglevel}
 	OPENRC-CONF
 	cat > "$BUILDDIR/$PKGNAME/data/etc/init.d/pimodem" <<-'OPENRC-INIT'
 		#!/sbin/openrc-run
 
 		command=/usr/sbin/pimodem
-		command_args="-d ${SERIAL} --logger=${LOGDEST} --port=${PORT} --ip=${IPADDR}"
+		command_args="-d ${SERIAL} --logger=${LOGDEST} --level=${LOGLEVEL} --port=${PORT} --ip=${IPADDR}"
 		command_background=true
 		pidfile="/var/run/${RC_SVCNAME}.pid"
 
@@ -105,7 +107,7 @@ rm -rf $BUILDDIR/$PKGNAME
 mkdir -p $BUILDDIR/$PKGNAME || exit 1
 
 compile_alsa $ALSA_VERSION
-install_pimodem /dev/ttyAMA0 syslog 6400 0.0.0.0 || exit 1
+install_pimodem /dev/ttyAMA0 syslog $LOGLEVEL 6400 0.0.0.0 || exit 1
 generate_metafiles || exit 1
 create_apk || exit 1
 
