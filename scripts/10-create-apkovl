@@ -31,6 +31,10 @@ add_sysfs_conf() {
 	SYSFSCONF
 }
 
+setup_syslog_conf() {
+	echo "local7.*                                 /var/log/pimodem.log" >> $BUILDDIR/apkovl/etc/syslog.conf
+}
+
 setup_rc_local() {
 	mkdir -p $BUILDDIR/apkovl/etc/local.d || return $?
 	cat > "$BUILDDIR/apkovl/etc/local.d/01-create-user.start" <<-'RCUSER'
@@ -212,6 +216,7 @@ setup_network || exit 1
 configure_world || exit 1
 configure_run_levels || exit 1
 configure_timezone UTC || exit 1
+setup_syslog_conf || exit 1
 setup_keymap us us || exit 1
 setup_lbu || exit 1
 setup_rc_local || exit 1
