@@ -37,7 +37,7 @@ setup_rc_local() {
 		#!/bin/ash
 
 		read_password() {
-		    echo -n $(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=3584 bs=1 count=106 status=noxfer 2> /dev/null)
+		    echo -n $(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=8192 bs=1 count=106 status=noxfer 2> /dev/null)
 		}
 
 		getent passwd admin >/dev/null 2>&1
@@ -58,14 +58,14 @@ setup_rc_local() {
 		    printf "%d.%d.%d.%d" "0x\${ip:0:2}" "0x\${ip:2:2}" "0x\${ip:4:2}" "0x\${ip:6:2}"
 		}
 
-		ipaddr=\$(read_ipv4 3690)
+		ipaddr=\$(read_ipv4 8298)
 		echo "auto $INTERFACE" >> /etc/network/interfaces
 		if [ "\$ipaddr" = "0.0.0.0" ]; then
 		    echo "iface $INTERFACE inet dhcp" >> /etc/network/interfaces
 		else
-		    dns=\$(read_ipv4 3702)
-		    gateway=\$(read_ipv4 3698)
-		    netmask=\$(read_ipv4 3694)
+		    dns=\$(read_ipv4 8310)
+		    gateway=\$(read_ipv4 8306)
+		    netmask=\$(read_ipv4 8302)
 		    echo "nameserver \$dns" > /etc/resolv.conf
 		    echo "iface $INTERFACE inet static" >> /etc/network/interfaces
 		    echo "    address \$ipaddr" >> /etc/network/interfaces
