@@ -78,7 +78,22 @@ setup_rc_local() {
 		fi
 	RCNETWORK
 	chmod 755 "$BUILDDIR/apkovl/etc/local.d/02-configure-network.start"
-	cat > "$BUILDDIR/apkovl/etc/local.d/03-add-mdev-entries.start" <<-'MDEV'
+	cat > "$BUILDDIR/apkovl/etc/local.d/03-configure-pimodem-baudrate.start" <<-'PIMODEM'
+		#!/bin/ash
+		read_baudrate() {
+		    local baud=$(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=8314 bs=1 count=2 status=noxfer 2> /dev/null | xxd -p | tr -d '[:space:]')
+		    printf "%d" "0x${baud}"
+		}
+
+		baud=$(read_baudrate)
+
+		if [ $baud -eq "0" ]; then
+			baud=9600
+		fi
+		echo "BAUDRATE=$baud" >> /etc/conf.d/pimodem
+	PIMODEM
+	chmod 755 "$BUILDDIR/apkovl/etc/local.d/03-configure-pimodem-baudrate.start"
+	cat > "$BUILDDIR/apkovl/etc/local.d/04-add-mdev-entries.start" <<-'MDEV'
 		#!/bin/ash
 
 		echo "gpiomem		root:admin 0660" >> /etc/mdev.conf
@@ -86,7 +101,7 @@ setup_rc_local() {
 
 		/sbin/mdev -s
 	MDEV
-	chmod 755 "$BUILDDIR/apkovl/etc/local.d/03-add-mdev-entries.start"
+	chmod 755 "$BUILDDIR/apkovl/etc/local.d/04-add-mdev-entries.start"
 }
 
 setup_wpa() {

@@ -53,7 +53,7 @@ install_pimodem() {
 		#!/sbin/openrc-run
 
 		command=/usr/sbin/pimodem
-		command_args="-d ${SERIAL} --logger=${LOGDEST} --level=${LOGLEVEL} --port=${PORT} --ip=${IPADDR}"
+		command_args="-d ${SERIAL} --speed=${BAUDRATE} --logger=${LOGDEST} --level=${LOGLEVEL} --port=${PORT} --ip=${IPADDR}"
 		command_background=true
 		pidfile="/var/run/${RC_SVCNAME}.pid"
 
