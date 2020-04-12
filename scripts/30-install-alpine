@@ -21,6 +21,46 @@ parse_field() {
 	echo $(tar -O -xzf $1 .PKGINFO 2>/dev/null | sed -n -r "s/$field = (.*)/\1/p"| tr '\n' ' ')
 }
 
+
+generate_i2c_gpio_overlay() {
+	local output=$1
+	dtc -@ -q -I dts -O dtb -o $output - <<-DTS
+		// Overlay for i2c_gpio bitbanging host bus.
+		/dts-v1/;
+		/plugin/;
+
+		/ {
+		    compatible = "brcm,bcm2835";
+
+		    fragment@0 {
+		        target-path = "/";
+
+		        __overlay__ {
+		            i2c_gpio: i2c@0 {
+		                reg = <0xffffffff>;
+		                compatible = "i2c-gpio";
+		                gpios = <&gpio 0 0 /* sda */
+		                         &gpio 1 0 /* scl */
+		                        >;
+		                i2c-gpio,delay-us = <2>;        /* ~100 kHz */
+		                #address-cells = <1>;
+		                #size-cells = <0>;
+		            };
+		        };
+		    };
+
+		    fragment@1 {
+		        target-path = "/aliases";
+		        __overlay__ {
+		            i2c_gpio = "/i2c@0";
+		        };
+		    };
+
+		};
+	DTS
+}
+
+
 add_apk() {
 	local apk=$1
 	local repo=$2/armhf
@@ -82,4 +122,5 @@ cp $BUILDDIR/$PKGNAME/pimodem-1.0.0-r0.apk $BUILDDIR/rootfs/pimodem/armhf || exi
 generate_index $BUILDDIR/rootfs/pimodem/ || exit 1
 cp $BUILDDIR/pimodem.apkovl.tar.gz $BUILDDIR/rootfs
 echo "modules=loop,squashfs,sd-mod,usb-storage quiet console=tty1 iomem=relaxed" > $BUILDDIR/rootfs/cmdline.txt
+generate_i2c_gpio_overlay $BUILDDIR/rootfs/overlays/i2c-gpio.dtbo
 exit 0

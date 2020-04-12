@@ -39,9 +39,11 @@ install_pimodem() {
 	mkdir -p $BUILDDIR/$PKGNAME/data/etc/init.d || return $?
 	mkdir -p $BUILDDIR/$PKGNAME/data/etc/conf.d || return $?
 	mkdir -p $BUILDDIR/$PKGNAME/data/usr/sbin || return $?
+	mkdir -p $BUILDDIR/$PKGNAME/data/usr/lib/firmware || return $?
 	git submodule update --init --remote pimodem || return $?
 	make --no-print-directory -C $TOP/pimodem || return $?
 	install -m 755 -D -t $BUILDDIR/$PKGNAME/data/usr/sbin $TOP/pimodem/src/bin/$PACKAGE || return $?
+	install -m 755 -D -t $BUILDDIR/$PKGNAME/data/usr/lib/firmware $TOP/pimodem/eeprom/pimodem.eep || return $?
 	cat > "$BUILDDIR/$PKGNAME/data/etc/conf.d/pimodem" <<-OPENRC-CONF
 		SERIAL=${serial}
 		LOGDEST=${logdest}

@@ -37,6 +37,59 @@ setup_syslog_conf() {
 
 setup_rc_local() {
 	mkdir -p $BUILDDIR/apkovl/etc/local.d || return $?
+	mkdir -p $BUILDDIR/apkovl/etc/conf.d || return $?
+	echo "rc_verbose=yes" >  $BUILDDIR/apkovl/etc/conf.d/local || return $?
+	cat > "$BUILDDIR/apkovl/etc/local.d/00-install-firmware.start" <<-'FIRMWARE'
+		#!/bin/ash
+		wait_for() {
+		    local pid=$1
+		    spin='-\|/'
+
+		    echo 22 > /sys/class/gpio/export
+		    echo "out" > /sys/class/gpio/gpio22/direction
+		    echo "0" > /sys/class/gpio/gpio22/value
+
+		    echo 27 > /sys/class/gpio/export
+		    echo "out" > /sys/class/gpio/gpio27/direction
+		    echo "1" > /sys/class/gpio/gpio27/value
+
+		    i=0
+		    while kill -0 $pid 2>/dev/null
+		    do
+		        i=$(( (i+1) %4 ))
+		        printf "\b${spin:$i:1}"
+
+		        if [[ $(expr $i % 2) = "0" ]]; then
+		            echo "1" > /sys/class/gpio/gpio22/value
+		            echo "0" > /sys/class/gpio/gpio27/value
+		        else
+		            echo "0" > /sys/class/gpio/gpio22/value
+		            echo "1" > /sys/class/gpio/gpio27/value
+		        fi
+
+		        sleep .5
+		    done
+		    echo "0" > /sys/class/gpio/gpio22/value
+		    echo "0" > /sys/class/gpio/gpio27/value
+		}
+
+		if [ -f /sys/bus/nvmem/devices/3-00500/nvmem ]; then
+			exit 0
+		fi
+		echo 1 > /proc/sys/kernel/sysrq
+		mkdir -p /sys/kernel/config/device-tree/overlays/i2c-gpio
+		cat /media/mmcblk0p1/overlays/i2c-gpio.dtbo > /sys/kernel/config/device-tree/overlays/i2c-gpio/dtbo
+		/sbin/modprobe at24
+		/bin/sleep 2
+		echo 24c512 0x50 > /sys/bus/i2c/devices/i2c-3/new_device
+		echo -en "\e[1;32m *\e[0m        Loading Firmware into eeprom...."
+		dd if=/usr/lib/firmware/pimodem.eep of=/sys/bus/nvmem/devices/3-00500/nvmem bs=1024 status=noxfer >/dev/null 2>&1 &
+		wait_for $!
+		echo -e "\bdone"
+		/bin/sleep 2
+		echo b > /proc/sysrq-trigger
+	FIRMWARE
+	chmod 755 "$BUILDDIR/apkovl/etc/local.d/00-install-firmware.start"
 	cat > "$BUILDDIR/apkovl/etc/local.d/01-create-user.start" <<-'RCUSER'
 		#!/bin/ash
 
@@ -48,18 +101,18 @@ setup_rc_local() {
 		if [ $? -ne 0 ]; then
 		    adduser -D admin
 		    adduser admin audio
-		    echo "admin:$(read_password)" | chpasswd -e
+		    echo "admin:$(read_password)" | chpasswd -e >/dev/null 2>&1
 		fi
-		passwd -l root
+		passwd -l root >/dev/null 2>&1
 	RCUSER
 	chmod 755 "$BUILDDIR/apkovl/etc/local.d/01-create-user.start"
 	cat > "$BUILDDIR/apkovl/etc/local.d/02-configure-network.start" <<-RCNETWORK
 		#!/bin/ash
 
 		read_ipv4() {
-		    local offset=$1
+		    local offset=\$1
 		    local ip=\$(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=\$offset bs=1 count=4 status=noxfer 2> /dev/null | xxd -p)
-		    printf "%d.%d.%d.%d" "0x\${ip:0:2}" "0x\${ip:2:2}" "0x\${ip:4:2}" "0x\${ip:6:2}"
+		    printf "%d.%d.%d.%d" "0x\${ip:0:2}" "0x\${ip:2:2}" "0x\${ip:4:2}" "0x\${ip:6:2}" 2>/dev/null
 		}
 
 		ipaddr=\$(read_ipv4 8298)
@@ -82,7 +135,7 @@ setup_rc_local() {
 		#!/bin/ash
 		read_baudrate() {
 		    local baud=$(dd if=/sys/bus/nvmem/devices/3-00500/nvmem skip=8314 bs=1 count=2 status=noxfer 2> /dev/null | xxd -p | tr -d '[:space:]')
-		    printf "%d" "0x${baud}"
+		    printf "%d" "0x${baud}" 2>/dev/null
 		}
 
 		baud=$(read_baudrate)
