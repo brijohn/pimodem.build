@@ -114,9 +114,9 @@ add_apk alsa-utils-openrc-1.1.9-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
 add_apk alsa-lib-1.1.9-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
 add_apk alsa-lib-dev-1.1.9-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
 add_apk pkgconf-1.6.1-r1.apk $BUILDDIR/rootfs/pimodem/ || exit 1
-add_apk dropbear-2019.78-r0.apk  $BUILDDIR/rootfs/pimodem/ || exit 1
-add_apk dropbear-scp-2019.78-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
-add_apk dropbear-openrc-2019.78-r0.apk $BUILDDIR/rootfs/pimodem/ || exit 1
+add_apk dropbear-2019.78-r1.apk  $BUILDDIR/rootfs/pimodem/ || exit 1
+add_apk dropbear-scp-2019.78-r1.apk $BUILDDIR/rootfs/pimodem/ || exit 1
+add_apk dropbear-openrc-2019.78-r1.apk $BUILDDIR/rootfs/pimodem/ || exit 1
 add_apk sudo-1.8.27-r2.apk $BUILDDIR/rootfs/pimodem/ || exit 1
 cp $BUILDDIR/$PKGNAME/pimodem-1.0.0-r0.apk $BUILDDIR/rootfs/pimodem/armhf || exit 1
 generate_index $BUILDDIR/rootfs/pimodem/ || exit 1
